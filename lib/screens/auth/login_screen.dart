@@ -146,7 +146,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             const SizedBox(width: 12),
             const Text(
-              'FinanceFlow',
+              'DULTH App',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
             ),
           ],

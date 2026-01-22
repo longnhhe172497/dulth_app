@@ -50,5 +50,5 @@ class AppStrings {
   static const financialWorryVN = "Giải quyết nỗi lo tài chính";
   static const financialWorryKR = "tài chính 고민 해결";
 
-  static const appName = "FinanceFlow";
+  static const appName = "DULTH App";
 }

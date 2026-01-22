@@ -24,7 +24,7 @@ class FinanceFlowApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'FinanceFlow',
+      title: 'DULTH App',
       debugShowCheckedModeBanner: false,
 
       // --- 1. CẤU HÌNH THEME SÁNG (LIGHT MODE) ---

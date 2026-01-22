@@ -145,13 +145,13 @@ class _TransactionCalendarScreenState extends State<TransactionCalendarScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                if (hasIncome) Container(width: 4, height: 4, decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle)),
+                if (hasIncome) Container(width: 2, height: 2, decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle)),
                 if (hasIncome && hasExpense) const SizedBox(width: 2),
-                if (hasExpense) Container(width: 4, height: 4, decoration: const BoxDecoration(color: Colors.orange, shape: BoxShape.circle)),
+                if (hasExpense) Container(width: 2, height: 2, decoration: const BoxDecoration(color: Colors.orange, shape: BoxShape.circle)),
               ],
             )
           ],

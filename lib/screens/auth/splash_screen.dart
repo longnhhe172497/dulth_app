@@ -67,7 +67,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
             // --- App Name ---
             const Text(
-              'FinanceFlow',
+              'DULTH App',
               style: TextStyle(
                 fontSize: 40,
                 fontWeight: FontWeight.bold,
