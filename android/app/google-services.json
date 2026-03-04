@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "600881030937",
+    "project_id": "dulth-bf42e",
+    "storage_bucket": "dulth-bf42e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:600881030937:android:3c0dac8a3449436b7d0788",
+        "android_client_info": {
+          "package_name": "com.example.dulth_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAB7cN1J_p3bQ61Ju84GlLH9IPN_I65ftc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
