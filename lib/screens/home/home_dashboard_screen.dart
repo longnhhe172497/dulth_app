@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../constants.dart';
 import '../../l10n/app_localizations.dart';
 import 'transaction_details_screen.dart';
+import '../../utils/currency_formatter.dart';
 
 class HomeDashboardScreen extends StatelessWidget {
   const HomeDashboardScreen({super.key});
@@ -203,8 +204,7 @@ class HomeDashboardScreen extends StatelessWidget {
         final data =
         snapshot.data!.data() as Map<String, dynamic>;
 
-        final balance = data["balance"] ?? 0;
-        final currency = data["currency"] ?? "VND";
+        final balance = (data["balance"] ?? 0).toDouble();
 
         return Container(
 
@@ -237,7 +237,7 @@ class HomeDashboardScreen extends StatelessWidget {
               const SizedBox(height: 8),
 
               Text(
-                "$balance $currency",
+                formatVND(balance),
                 style: const TextStyle(
                     color: Colors.white,
                     fontSize: 32,
@@ -249,7 +249,6 @@ class HomeDashboardScreen extends StatelessWidget {
               Row(
                 children: [
 
-                  /// ADD MONEY
                   Expanded(
                     child: ElevatedButton.icon(
                       icon: const Icon(Icons.add),
@@ -266,7 +265,6 @@ class HomeDashboardScreen extends StatelessWidget {
 
                   const SizedBox(width: 12),
 
-                  /// WITHDRAW
                   Expanded(
                     child: ElevatedButton.icon(
                       icon: const Icon(Icons.remove),
@@ -383,7 +381,7 @@ class HomeDashboardScreen extends StatelessWidget {
           const SizedBox(height: 6),
 
           Text(
-            "₫${amount.toStringAsFixed(0)}",
+            formatVND(amount),
             style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -397,32 +395,37 @@ class HomeDashboardScreen extends StatelessWidget {
   /// TRANSACTIONS
   Widget _buildTransactions(String uid) {
 
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection("users")
-          .doc(uid)
-          .collection("transactions")
-          .orderBy("date", descending: true)
-          .snapshots(),
+    return SliverToBoxAdapter(
 
-      builder: (context, snapshot) {
+      child: StreamBuilder<QuerySnapshot>(
 
-        if (!snapshot.hasData) {
-          return const SliverToBoxAdapter(
-            child: Center(
-                child: CircularProgressIndicator()),
-          );
-        }
+        stream: FirebaseFirestore.instance
+            .collection("users")
+            .doc(uid)
+            .collection("transactions")
+            .orderBy("date", descending: true)
+            .snapshots(),
 
-        final docs = snapshot.data!.docs;
+        builder: (context, snapshot) {
 
-        return SliverList(
-          delegate: SliverChildBuilderDelegate(
-                (context, index) {
+          if (!snapshot.hasData) {
+            return const Center(
+                child: CircularProgressIndicator());
+          }
+
+          final docs = snapshot.data!.docs;
+
+          return ListView.builder(
+
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+
+            itemCount: docs.length,
+
+            itemBuilder: (context, index) {
 
               final data =
-              docs[index].data()
-              as Map<String, dynamic>;
+              docs[index].data() as Map<String, dynamic>;
 
               final amount =
               (data["amount"] ?? 0).toDouble();
@@ -430,30 +433,34 @@ class HomeDashboardScreen extends StatelessWidget {
               final type =
               (data["type"] ?? "").toString();
 
+              final category =
+                  data["category"] ?? "";
+
               return ListTile(
 
                 leading: CircleAvatar(
                   backgroundColor:
-                  Colors.green.withOpacity(0.15),
+                  Colors.green.withOpacity(.15),
 
                   child: Icon(
-                    _getCategoryIcon(
-                        data["category"]),
+                    _getCategoryIcon(category),
                     color: Colors.green,
                   ),
                 ),
 
-                title: Text(data["category"] ?? ""),
+                title: Text(data["note"] ?? ""),
 
-                subtitle: Text(data["note"] ?? ""),
+                subtitle: Text(
+                    _formatDate(data["date"])),
 
                 trailing: Text(
-                  "₫${amount.toStringAsFixed(0)}",
+                  formatVND(amount),
                   style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: type == "income"
-                          ? Colors.green
-                          : Colors.red),
+                    color: type == "income"
+                        ? Colors.green
+                        : Colors.red,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
 
                 onTap: () {
@@ -463,8 +470,7 @@ class HomeDashboardScreen extends StatelessWidget {
                     MaterialPageRoute(
                       builder: (_) =>
                           TransactionDetailsScreen(
-                            transactionId:
-                            docs[index].id,
+                            transactionId: docs[index].id,
                             data: data,
                           ),
                     ),
@@ -472,36 +478,56 @@ class HomeDashboardScreen extends StatelessWidget {
                 },
               );
             },
-
-            childCount: docs.length,
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
+  /// FORMAT DATE
+  String _formatDate(dynamic date) {
+
+    if (date == null) return "";
+
+    if (date is Timestamp) {
+      final d = date.toDate();
+      return "${d.day}/${d.month}/${d.year}";
+    }
+
+    return date.toString();
+  }
+
+  /// CATEGORY ICON
   IconData _getCategoryIcon(String? category) {
 
     switch (category) {
 
-      case "Food":
-      case "Ăn uống":
+      case "food":
         return Icons.restaurant;
 
-      case "Shopping":
-      case "Mua sắm":
+      case "shopping":
         return Icons.shopping_bag;
 
-      case "Transport":
-      case "Di chuyển":
+      case "transport":
         return Icons.directions_car;
 
-      case "Tech":
-      case "Công nghệ":
+      case "tech":
         return Icons.computer;
 
+      case "salary":
+        return Icons.payments;
+
+      case "gift":
+        return Icons.card_giftcard;
+
+      case "investment":
+        return Icons.trending_up;
+
+      case "other_income":
+        return Icons.attach_money;
+
       default:
-        return Icons.category;
+        return Icons.account_balance_wallet;
     }
   }
 
@@ -519,22 +545,19 @@ class HomeDashboardScreen extends StatelessWidget {
 
         return AlertDialog(
 
-          title: const Text("Nạp tiền"),
+          title: const Text("Add Money"),
 
           content: TextField(
             controller: controller,
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-                hintText: "Nhập số tiền"),
           ),
 
           actions: [
 
             TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child: const Text("Hủy"),
+              onPressed: () =>
+                  Navigator.pop(context),
+              child: const Text("Cancel"),
             ),
 
             ElevatedButton(
@@ -552,12 +575,8 @@ class HomeDashboardScreen extends StatelessWidget {
                     .doc(uid)
                     .get();
 
-                final data =
-                doc.data()
-                as Map<String, dynamic>;
-
                 final currentBalance =
-                (data["balance"] ?? 0)
+                (doc.data()!["balance"] ?? 0)
                     .toDouble();
 
                 await FirebaseFirestore
@@ -571,7 +590,8 @@ class HomeDashboardScreen extends StatelessWidget {
 
                 Navigator.pop(context);
               },
-              child: const Text("Xác nhận"),
+
+              child: const Text("Confirm"),
             )
           ],
         );
@@ -593,22 +613,19 @@ class HomeDashboardScreen extends StatelessWidget {
 
         return AlertDialog(
 
-          title: const Text("Rút tiền"),
+          title: const Text("Withdraw"),
 
           content: TextField(
             controller: controller,
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-                hintText: "Nhập số tiền"),
           ),
 
           actions: [
 
             TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child: const Text("Hủy"),
+              onPressed: () =>
+                  Navigator.pop(context),
+              child: const Text("Cancel"),
             ),
 
             ElevatedButton(
@@ -626,12 +643,8 @@ class HomeDashboardScreen extends StatelessWidget {
                     .doc(uid)
                     .get();
 
-                final data =
-                doc.data()
-                as Map<String, dynamic>;
-
                 final currentBalance =
-                (data["balance"] ?? 0)
+                (doc.data()!["balance"] ?? 0)
                     .toDouble();
 
                 await FirebaseFirestore
@@ -645,7 +658,8 @@ class HomeDashboardScreen extends StatelessWidget {
 
                 Navigator.pop(context);
               },
-              child: const Text("Xác nhận"),
+
+              child: const Text("Confirm"),
             )
           ],
         );

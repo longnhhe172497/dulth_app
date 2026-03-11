@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../constants.dart';
 import '../services/firestore_service.dart';
 import '../l10n/app_localizations.dart';
+import '../utils/currency_formatter.dart';
 
 class AddTransactionBottomSheet extends StatefulWidget {
   const AddTransactionBottomSheet({super.key});
@@ -15,7 +19,6 @@ class _AddTransactionBottomSheetState
     extends State<AddTransactionBottomSheet> {
 
   bool _isExpense = true;
-
   String _selectedCategory = "food";
 
   DateTime _selectedDate = DateTime.now();
@@ -28,29 +31,94 @@ class _AddTransactionBottomSheetState
 
   bool _isLoading = false;
 
+  /// DATE PICKER
   Future<void> _pickDate() async {
 
     final picked = await showDatePicker(
-
       context: context,
-
       initialDate: _selectedDate,
-
       firstDate: DateTime(2020),
-
       lastDate: DateTime(2100),
-
     );
 
     if (picked != null) {
-
       setState(() {
         _selectedDate = picked;
       });
-
     }
   }
 
+  /// WARNING DIALOG
+  void _showInsufficientBalance(double balance, double amount) {
+
+    final loc = AppLocalizations.of(context);
+
+    showDialog(
+
+      context: context,
+
+      builder: (context) {
+
+        return AlertDialog(
+
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+
+          title: Row(
+            children: [
+              const Icon(Icons.warning, color: Colors.red),
+              const SizedBox(width: 8),
+              Text(loc.insufficientBalance),
+            ],
+          ),
+
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+
+              Text(
+                "${loc.yourBalance}: ${formatVND(balance)}",
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+
+              const SizedBox(height: 8),
+
+              Text(
+                "${loc.youTriedToSpend}: ${formatVND(amount)}",
+                style: const TextStyle(color: Colors.red),
+              ),
+
+              const SizedBox(height: 12),
+
+              Text(loc.balanceWarningMessage),
+
+            ],
+          ),
+
+          actions: [
+
+            ElevatedButton(
+
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+              ),
+
+              onPressed: () {
+                Navigator.pop(context);
+              },
+
+              child: Text(loc.ok),
+
+            )
+          ],
+        );
+      },
+    );
+  }
+
+  /// SAVE TRANSACTION
   Future<void> _saveTransaction() async {
 
     if (_amountController.text.isEmpty) return;
@@ -61,9 +129,36 @@ class _AddTransactionBottomSheetState
 
     try {
 
+      final amount = double.parse(_amountController.text);
+
+      final uid = FirebaseAuth.instance.currentUser!.uid;
+
+      /// LẤY BALANCE HIỆN TẠI
+      final userDoc = await FirebaseFirestore.instance
+          .collection("users")
+          .doc(uid)
+          .get();
+
+      final data = userDoc.data() as Map<String, dynamic>;
+
+      final balance = (data["balance"] ?? 0).toDouble();
+
+      /// KIỂM TRA VƯỢT SỐ DƯ
+      if (_isExpense && amount > balance) {
+
+        _showInsufficientBalance(balance, amount);
+
+        setState(() {
+          _isLoading = false;
+        });
+
+        return;
+      }
+
+      /// LƯU TRANSACTION
       await FirestoreService().addTransaction(
 
-        amount: double.parse(_amountController.text),
+        amount: amount,
 
         category: _selectedCategory,
 
@@ -80,8 +175,11 @@ class _AddTransactionBottomSheetState
     } catch (e) {
 
       ScaffoldMessenger.of(context).showSnackBar(
+
         const SnackBar(
-            content: Text("Error saving transaction")),
+          content: Text("Error saving transaction"),
+        ),
+
       );
     }
 
@@ -124,6 +222,7 @@ class _AddTransactionBottomSheetState
 
           children: [
 
+            /// DRAG BAR
             Center(
               child: Container(
                 width: 48,
@@ -137,37 +236,44 @@ class _AddTransactionBottomSheetState
 
             const SizedBox(height: 24),
 
+            /// EXPENSE / INCOME SWITCH
             _buildToggleSwitch(isDarkMode, loc),
 
             const SizedBox(height: 32),
 
+            /// AMOUNT
             _buildLabel(loc.amount, isDarkMode),
 
             _buildAmountInput(isDarkMode),
 
             const SizedBox(height: 24),
 
+            /// CATEGORY
             _buildLabel(loc.category, isDarkMode),
 
             _buildCategoryGrid(isDarkMode, loc),
 
             const SizedBox(height: 24),
 
+            /// DATE
             _buildLabel(loc.date, isDarkMode),
 
             _buildDatePicker(isDarkMode),
 
             const SizedBox(height: 24),
 
+            /// NOTES
             _buildLabel(loc.notes, isDarkMode),
 
             _buildNotesInput(isDarkMode, loc),
 
             const SizedBox(height: 32),
 
+            /// SAVE BUTTON
             SizedBox(
 
               width: double.infinity,
+
               height: 56,
 
               child: ElevatedButton(
@@ -192,79 +298,7 @@ class _AddTransactionBottomSheetState
     );
   }
 
-  Widget _buildToggleSwitch(bool isDarkMode, AppLocalizations loc) {
-
-    return Container(
-
-      padding: const EdgeInsets.all(4),
-
-      decoration: BoxDecoration(
-        color: isDarkMode ? AppColors.cardDark : Colors.grey[200],
-        borderRadius: BorderRadius.circular(16),
-      ),
-
-      child: Row(
-
-        children: [
-
-          _buildToggleButton(
-            loc.expenses,
-            _isExpense,
-                () => setState(() => _isExpense = true),
-          ),
-
-          _buildToggleButton(
-            loc.income,
-            !_isExpense,
-                () => setState(() => _isExpense = false),
-          ),
-
-        ],
-      ),
-    );
-  }
-
-  Widget _buildToggleButton(
-      String label,
-      bool isActive,
-      VoidCallback onTap) {
-
-    return Expanded(
-
-      child: GestureDetector(
-
-        onTap: onTap,
-
-        child: Container(
-
-          padding:
-          const EdgeInsets.symmetric(vertical: 12),
-
-          decoration: BoxDecoration(
-            color: isActive
-                ? AppColors.primary
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-          ),
-
-          child: Center(
-
-            child: Text(
-
-              label,
-
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color:
-                isActive ? Colors.black : Colors.grey,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
+  /// LABEL
   Widget _buildLabel(String text, bool isDarkMode) {
 
     return Padding(
@@ -286,6 +320,7 @@ class _AddTransactionBottomSheetState
     );
   }
 
+  /// AMOUNT INPUT
   Widget _buildAmountInput(bool isDarkMode) {
 
     return TextField(
@@ -294,9 +329,10 @@ class _AddTransactionBottomSheetState
 
       keyboardType: TextInputType.number,
 
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 32,
         fontWeight: FontWeight.bold,
+        color: _isExpense ? Colors.red : Colors.green,
       ),
 
       decoration: InputDecoration(
@@ -307,29 +343,21 @@ class _AddTransactionBottomSheetState
 
         filled: true,
 
-        fillColor: isDarkMode
-            ? AppColors.inputBgDark
-            : Colors.white,
+        fillColor:
+        isDarkMode ? AppColors.inputBgDark : Colors.white,
 
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide.none,
         ),
-
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(
-              color: AppColors.primary, width: 2),
-        ),
       ),
     );
   }
 
-  Widget _buildCategoryGrid(
-      bool isDarkMode,
-      AppLocalizations loc) {
+  /// CATEGORY GRID
+  Widget _buildCategoryGrid(bool isDarkMode, AppLocalizations loc) {
 
-    final categories = [
+    final expenseCategories = [
 
       {'icon': Icons.restaurant, 'key': 'food', 'label': loc.food},
 
@@ -340,6 +368,21 @@ class _AddTransactionBottomSheetState
       {'icon': Icons.computer, 'key': 'tech', 'label': loc.tech},
 
     ];
+
+    final incomeCategories = [
+
+      {'icon': Icons.payments, 'key': 'salary', 'label': loc.income},
+
+      {'icon': Icons.card_giftcard, 'key': 'gift', 'label': "Gift"},
+
+      {'icon': Icons.trending_up, 'key': 'investment', 'label': "Investment"},
+
+      {'icon': Icons.attach_money, 'key': 'other_income', 'label': "Other"},
+
+    ];
+
+    final categories =
+    _isExpense ? expenseCategories : incomeCategories;
 
     return Wrap(
 
@@ -371,7 +414,9 @@ class _AddTransactionBottomSheetState
             decoration: BoxDecoration(
 
               color: isSelected
-                  ? AppColors.primary.withOpacity(0.15)
+                  ? (_isExpense
+                  ? Colors.red.withOpacity(0.15)
+                  : Colors.green.withOpacity(0.15))
                   : (isDarkMode
                   ? AppColors.cardDark
                   : Colors.white),
@@ -380,7 +425,9 @@ class _AddTransactionBottomSheetState
 
               border: Border.all(
                 color: isSelected
-                    ? AppColors.primary
+                    ? (_isExpense
+                    ? Colors.red
+                    : Colors.green)
                     : (isDarkMode
                     ? Colors.white10
                     : Colors.grey[300]!),
@@ -397,7 +444,9 @@ class _AddTransactionBottomSheetState
                   cat['icon'] as IconData,
                   size: 18,
                   color: isSelected
-                      ? AppColors.primary
+                      ? (_isExpense
+                      ? Colors.red
+                      : Colors.green)
                       : Colors.grey,
                 ),
 
@@ -407,7 +456,9 @@ class _AddTransactionBottomSheetState
                   cat['label'] as String,
                   style: TextStyle(
                     color: isSelected
-                        ? AppColors.primary
+                        ? (_isExpense
+                        ? Colors.red
+                        : Colors.green)
                         : Colors.grey,
                     fontWeight: isSelected
                         ? FontWeight.bold
@@ -423,6 +474,7 @@ class _AddTransactionBottomSheetState
     );
   }
 
+  /// DATE PICKER
   Widget _buildDatePicker(bool isDarkMode) {
 
     return GestureDetector(
@@ -466,9 +518,8 @@ class _AddTransactionBottomSheetState
     );
   }
 
-  Widget _buildNotesInput(
-      bool isDarkMode,
-      AppLocalizations loc) {
+  /// NOTES
+  Widget _buildNotesInput(bool isDarkMode, AppLocalizations loc) {
 
     return TextField(
 
@@ -482,15 +533,131 @@ class _AddTransactionBottomSheetState
 
         filled: true,
 
-        fillColor: isDarkMode
-            ? AppColors.inputBgDark
-            : Colors.white,
+        fillColor:
+        isDarkMode ? AppColors.inputBgDark : Colors.white,
 
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide.none,
         ),
       ),
+    );
+  }
+
+  Widget _buildToggleSwitch(bool isDarkMode, AppLocalizations loc) {
+
+    return Row(
+
+      children: [
+
+        Expanded(
+
+          child: GestureDetector(
+
+            onTap: () {
+
+              setState(() {
+                _isExpense = true;
+              });
+
+            },
+
+            child: Container(
+
+              padding: const EdgeInsets.symmetric(vertical: 12),
+
+              decoration: BoxDecoration(
+
+                color: _isExpense
+                    ? Colors.red
+                    : (isDarkMode ? Colors.grey[800] : Colors.grey[200]),
+
+                borderRadius: BorderRadius.circular(12),
+
+              ),
+
+              child: Center(
+
+                child: Text(
+
+                  loc.expenses,
+
+                  style: TextStyle(
+
+                    color: _isExpense
+                        ? Colors.white
+                        : (isDarkMode ? Colors.white70 : Colors.black54),
+
+                    fontWeight: FontWeight.bold,
+
+                  ),
+
+                ),
+
+              ),
+
+            ),
+
+          ),
+
+        ),
+
+        const SizedBox(width: 12),
+
+        Expanded(
+
+          child: GestureDetector(
+
+            onTap: () {
+
+              setState(() {
+                _isExpense = false;
+              });
+
+            },
+
+            child: Container(
+
+              padding: const EdgeInsets.symmetric(vertical: 12),
+
+              decoration: BoxDecoration(
+
+                color: !_isExpense
+                    ? Colors.green
+                    : (isDarkMode ? Colors.grey[800] : Colors.grey[200]),
+
+                borderRadius: BorderRadius.circular(12),
+
+              ),
+
+              child: Center(
+
+                child: Text(
+
+                  loc.income,
+
+                  style: TextStyle(
+
+                    color: !_isExpense
+                        ? Colors.white
+                        : (isDarkMode ? Colors.white70 : Colors.black54),
+
+                    fontWeight: FontWeight.bold,
+
+                  ),
+
+                ),
+
+              ),
+
+            ),
+
+          ),
+
+        ),
+
+      ],
+
     );
   }
 }

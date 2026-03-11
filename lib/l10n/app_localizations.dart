@@ -91,6 +91,14 @@ class AppLocalizations {
       'shopping': 'Shopping',
       'transport': 'Transport',
       'tech': 'Technology',
+
+      /// Warning Dialog
+      'insufficientBalance': 'Insufficient Balance',
+      'yourBalance': 'Your balance',
+      'youTriedToSpend': 'You tried to spend',
+      'balanceWarningMessage':
+      'You cannot spend more than your available balance.',
+      'ok': 'OK',
     },
 
     /// ================= VIETNAMESE =================
@@ -162,6 +170,14 @@ class AppLocalizations {
       'shopping': 'Mua sắm',
       'transport': 'Di chuyển',
       'tech': 'Công nghệ',
+
+      /// Warning Dialog
+      'insufficientBalance': 'Số dư không đủ',
+      'yourBalance': 'Số dư của bạn',
+      'youTriedToSpend': 'Bạn cố chi',
+      'balanceWarningMessage':
+      'Bạn không thể chi nhiều hơn số dư hiện có.',
+      'ok': 'Đồng ý',
     },
   };
 
@@ -235,6 +251,13 @@ class AppLocalizations {
   String get shopping => _get('shopping');
   String get transport => _get('transport');
   String get tech => _get('tech');
+
+  /// Warning Dialog
+  String get insufficientBalance => _get('insufficientBalance');
+  String get yourBalance => _get('yourBalance');
+  String get youTriedToSpend => _get('youTriedToSpend');
+  String get balanceWarningMessage => _get('balanceWarningMessage');
+  String get ok => _get('ok');
 }
 
 class _AppLocalizationsDelegate

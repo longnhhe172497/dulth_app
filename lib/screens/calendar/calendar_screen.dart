@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../constants.dart';
 import '../../l10n/app_localizations.dart';
+import '../../utils/currency_formatter.dart';
 
 class TransactionCalendarScreen extends StatefulWidget {
   const TransactionCalendarScreen({super.key});
@@ -33,14 +34,14 @@ class _TransactionCalendarScreenState
       isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
 
       appBar: AppBar(
-        elevation: 0,
         centerTitle: true,
+        elevation: 0,
         backgroundColor: Colors.transparent,
         title: Text(
           loc.calendarTitle,
           style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 18),
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
 
@@ -51,13 +52,9 @@ class _TransactionCalendarScreenState
 
           _weekRow(loc),
 
-          Expanded(
-            flex: 3,
-            child: _calendarGrid(isDark),
-          ),
+          _calendarGrid(isDark),
 
           Expanded(
-            flex: 4,
             child: _transactionList(isDark, loc),
           ),
 
@@ -66,23 +63,38 @@ class _TransactionCalendarScreenState
     );
   }
 
+  /// ===============================
   /// MONTH HEADER
+  /// ===============================
 
   Widget _monthHeader(AppLocalizations loc) {
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
 
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
 
         children: [
 
-          Text(
-            "${loc.month} ${_focusedDay.month}, ${_focusedDay.year}",
-            style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold),
+          Row(
+            children: [
+
+              const Icon(
+                Icons.calendar_month,
+                color: AppColors.primary,
+              ),
+
+              const SizedBox(width: 6),
+
+              Text(
+                "${loc.month} ${_focusedDay.month}, ${_focusedDay.year}",
+                style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold),
+              ),
+
+            ],
           ),
 
           Row(
@@ -91,21 +103,25 @@ class _TransactionCalendarScreenState
               _iconBtn(Icons.chevron_left, () {
 
                 setState(() {
+
                   _focusedDay = DateTime(
                       _focusedDay.year,
                       _focusedDay.month - 1);
+
                 });
 
               }),
 
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
 
               _iconBtn(Icons.chevron_right, () {
 
                 setState(() {
+
                   _focusedDay = DateTime(
                       _focusedDay.year,
                       _focusedDay.month + 1);
+
                 });
 
               }),
@@ -124,10 +140,11 @@ class _TransactionCalendarScreenState
       onTap: onTap,
 
       child: Container(
+
         padding: const EdgeInsets.all(6),
 
         decoration: BoxDecoration(
-          color: Colors.grey[200],
+          color: Colors.grey.withOpacity(0.2),
           shape: BoxShape.circle,
         ),
 
@@ -136,7 +153,9 @@ class _TransactionCalendarScreenState
     );
   }
 
+  /// ===============================
   /// WEEK HEADER
+  /// ===============================
 
   Widget _weekRow(AppLocalizations loc) {
 
@@ -151,7 +170,7 @@ class _TransactionCalendarScreenState
     ];
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 4),
 
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -161,9 +180,10 @@ class _TransactionCalendarScreenState
           return Text(
             d,
             style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
-                color: Colors.grey),
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey,
+            ),
           );
 
         }).toList(),
@@ -171,7 +191,9 @@ class _TransactionCalendarScreenState
     );
   }
 
+  /// ===============================
   /// CALENDAR GRID
+  /// ===============================
 
   Widget _calendarGrid(bool isDark) {
 
@@ -183,130 +205,159 @@ class _TransactionCalendarScreenState
 
     int startWeekday = firstDay.weekday % 7;
 
-    return StreamBuilder<QuerySnapshot>(
+    return SizedBox(
 
-      stream: FirebaseFirestore.instance
-          .collection("users")
-          .doc(uid)
-          .collection("transactions")
-          .where("month", isEqualTo: _focusedDay.month)
-          .where("year", isEqualTo: _focusedDay.year)
-          .snapshots(),
+      height: 220,
 
-      builder: (context, snapshot) {
+      child: StreamBuilder<QuerySnapshot>(
 
-        Map<int, double> dailyTotal = {};
-        Set<int> txDays = {};
+        stream: FirebaseFirestore.instance
+            .collection("users")
+            .doc(uid)
+            .collection("transactions")
+            .where("month", isEqualTo: _focusedDay.month)
+            .where("year", isEqualTo: _focusedDay.year)
+            .snapshots(),
 
-        if (snapshot.hasData) {
+        builder: (context, snapshot) {
 
-          for (var doc in snapshot.data!.docs) {
+          Map<int, double> dailyTotal = {};
+          Set<int> txDays = {};
 
-            final data = doc.data() as Map<String, dynamic>;
+          if (snapshot.hasData) {
 
-            int day = data["day"];
-            double amount = (data["amount"] ?? 0).toDouble();
+            for (var doc in snapshot.data!.docs) {
 
-            txDays.add(day);
+              final data = doc.data() as Map<String, dynamic>;
 
-            dailyTotal[day] =
-                (dailyTotal[day] ?? 0) + amount;
-          }
-        }
+              int day = data["day"];
+              double amount = (data["amount"] ?? 0).toDouble();
 
-        return GridView.builder(
+              txDays.add(day);
 
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-
-          gridDelegate:
-          const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 7,
-            mainAxisSpacing: 6,
-            crossAxisSpacing: 6,
-          ),
-
-          itemCount: daysInMonth + startWeekday,
-
-          itemBuilder: (context, index) {
-
-            if (index < startWeekday) {
-              return const SizedBox();
+              dailyTotal[day] =
+                  (dailyTotal[day] ?? 0) + amount;
             }
+          }
 
-            int day = index - startWeekday + 1;
+          return GridView.builder(
 
-            DateTime date =
-            DateTime(_focusedDay.year, _focusedDay.month, day);
+            physics: const BouncingScrollPhysics(),
 
-            bool selected =
-            DateUtils.isSameDay(date, _selectedDay);
+            padding: const EdgeInsets.symmetric(horizontal: 12),
 
-            return GestureDetector(
+            gridDelegate:
+            const SliverGridDelegateWithFixedCrossAxisCount(
 
-              onTap: () {
+              crossAxisCount: 7,
 
-                setState(() {
-                  _selectedDay = date;
-                });
+              mainAxisSpacing: 4,
+              crossAxisSpacing: 4,
 
-              },
+              childAspectRatio: 1,
+            ),
 
-              child: Container(
+            itemCount: daysInMonth + startWeekday,
 
-                decoration: BoxDecoration(
+            itemBuilder: (context, index) {
 
-                  color: selected
-                      ? AppColors.primary
-                      : Colors.transparent,
+              if (index < startWeekday) {
+                return const SizedBox();
+              }
 
-                  borderRadius: BorderRadius.circular(10),
+              int day = index - startWeekday + 1;
 
-                ),
+              DateTime date =
+              DateTime(_focusedDay.year, _focusedDay.month, day);
 
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+              bool selected =
+              DateUtils.isSameDay(date, _selectedDay);
 
-                  children: [
+              return GestureDetector(
 
-                    Text(
-                      "$day",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: selected
-                            ? Colors.black
-                            : (isDark ? Colors.white : Colors.black),
-                      ),
+                onTap: () {
+
+                  setState(() {
+                    _selectedDay = date;
+                  });
+
+                },
+
+                child: AnimatedContainer(
+
+                  duration: const Duration(milliseconds: 200),
+
+                  decoration: BoxDecoration(
+
+                    color: selected
+                        ? AppColors.primary
+                        : Colors.transparent,
+
+                    borderRadius: BorderRadius.circular(12),
+
+                    border: Border.all(
+                      color: Colors.grey.withOpacity(0.2),
                     ),
+                  ),
 
-                    if (dailyTotal.containsKey(day))
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+
+                    children: [
+
+                      /// DAY NUMBER
+
                       Text(
-                        "₫${dailyTotal[day]!.toStringAsFixed(0)}",
-                        style: const TextStyle(
-                            fontSize: 9,
-                            color: Colors.red),
-                      ),
-
-                    if (txDays.contains(day))
-                      Container(
-                        margin: const EdgeInsets.only(top: 2),
-                        width: 4,
-                        height: 4,
-                        decoration: const BoxDecoration(
-                          color: Colors.red,
-                          shape: BoxShape.circle,
+                        "$day",
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: selected
+                              ? Colors.black
+                              : (isDark
+                              ? Colors.white
+                              : Colors.black),
                         ),
                       ),
-                  ],
+
+                      /// TOTAL MONEY
+
+                      if (dailyTotal.containsKey(day))
+                        Text(
+                          formatVND(dailyTotal[day]!),
+                          style: const TextStyle(
+                            fontSize: 8,
+                            color: Colors.red,
+                          ),
+                        ),
+
+                      /// DOT
+
+                      if (txDays.contains(day))
+                        Container(
+                          margin: const EdgeInsets.only(top: 2),
+                          width: 4,
+                          height: 4,
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+
+                    ],
+                  ),
                 ),
-              ),
-            );
-          },
-        );
-      },
+              );
+            },
+          );
+        },
+      ),
     );
   }
 
+  /// ===============================
   /// TRANSACTION LIST
+  /// ===============================
 
   Widget _transactionList(bool isDark, AppLocalizations loc) {
 
@@ -357,11 +408,10 @@ class _TransactionCalendarScreenState
 
             itemBuilder: (context, index) {
 
-              final data = docs[index].data() as Map<String, dynamic>;
+              final data =
+              docs[index].data() as Map<String, dynamic>;
 
-              return _transactionItem(
-                  data,
-                  isDark);
+              return _transactionItem(data, isDark);
             },
           );
         },
@@ -369,7 +419,9 @@ class _TransactionCalendarScreenState
     );
   }
 
+  /// ===============================
   /// TRANSACTION ITEM
+  /// ===============================
 
   Widget _transactionItem(Map<String, dynamic> data, bool isDark) {
 
@@ -385,7 +437,11 @@ class _TransactionCalendarScreenState
       padding: const EdgeInsets.all(12),
 
       decoration: BoxDecoration(
-        color: isDark ? AppColors.backgroundDark : Colors.grey[100],
+
+        color: isDark
+            ? AppColors.backgroundDark
+            : Colors.grey[100],
+
         borderRadius: BorderRadius.circular(14),
       ),
 
@@ -433,10 +489,11 @@ class _TransactionCalendarScreenState
           ),
 
           Text(
-            "₫${amount.toStringAsFixed(0)}",
+            formatVND(amount),
             style: TextStyle(
               fontWeight: FontWeight.bold,
-              color: type == "income"
+              color:
+              type == "income"
                   ? Colors.green
                   : Colors.red,
             ),
@@ -445,6 +502,10 @@ class _TransactionCalendarScreenState
       ),
     );
   }
+
+  /// ===============================
+  /// CATEGORY ICON
+  /// ===============================
 
   IconData _iconByCategory(String c) {
 
@@ -461,6 +522,9 @@ class _TransactionCalendarScreenState
 
       case "tech":
         return Icons.computer;
+
+      case "bills":
+        return Icons.receipt;
 
       default:
         return Icons.account_balance_wallet;
