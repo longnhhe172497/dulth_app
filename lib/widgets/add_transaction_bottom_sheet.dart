@@ -1,115 +1,262 @@
 import 'package:flutter/material.dart';
 import '../constants.dart';
+import '../services/firestore_service.dart';
+import '../l10n/app_localizations.dart';
 
 class AddTransactionBottomSheet extends StatefulWidget {
   const AddTransactionBottomSheet({super.key});
 
   @override
-  State<AddTransactionBottomSheet> createState() => _AddTransactionBottomSheetState();
+  State<AddTransactionBottomSheet> createState() =>
+      _AddTransactionBottomSheetState();
 }
 
-class _AddTransactionBottomSheetState extends State<AddTransactionBottomSheet> {
+class _AddTransactionBottomSheetState
+    extends State<AddTransactionBottomSheet> {
+
   bool _isExpense = true;
-  String _selectedCategory = 'Ăn uống';
+
+  String _selectedCategory = "food";
+
+  DateTime _selectedDate = DateTime.now();
+
+  final TextEditingController _amountController =
+  TextEditingController();
+
+  final TextEditingController _noteController =
+  TextEditingController();
+
+  bool _isLoading = false;
+
+  Future<void> _pickDate() async {
+
+    final picked = await showDatePicker(
+
+      context: context,
+
+      initialDate: _selectedDate,
+
+      firstDate: DateTime(2020),
+
+      lastDate: DateTime(2100),
+
+    );
+
+    if (picked != null) {
+
+      setState(() {
+        _selectedDate = picked;
+      });
+
+    }
+  }
+
+  Future<void> _saveTransaction() async {
+
+    if (_amountController.text.isEmpty) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+
+      await FirestoreService().addTransaction(
+
+        amount: double.parse(_amountController.text),
+
+        category: _selectedCategory,
+
+        type: _isExpense ? "expense" : "income",
+
+        note: _noteController.text,
+
+        date: _selectedDate,
+
+      );
+
+      if (mounted) Navigator.pop(context);
+
+    } catch (e) {
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text("Error saving transaction")),
+      );
+    }
+
+    setState(() {
+      _isLoading = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    final loc = AppLocalizations.of(context);
+
+    bool isDarkMode =
+        Theme.of(context).brightness == Brightness.dark;
 
     return Container(
+
       padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom, // Đẩy lên khi mở bàn phím
+        bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
+
       decoration: BoxDecoration(
-        color: isDarkMode ? AppColors.backgroundDark : AppColors.backgroundLight,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        color: isDarkMode
+            ? AppColors.backgroundDark
+            : AppColors.backgroundLight,
+        borderRadius:
+        const BorderRadius.vertical(top: Radius.circular(32)),
       ),
+
       child: SingleChildScrollView(
+
         padding: const EdgeInsets.all(24),
+
         child: Column(
+
           mainAxisSize: MainAxisSize.min,
+
           crossAxisAlignment: CrossAxisAlignment.start,
+
           children: [
-            // --- 1. THANH KÉO (DRAG HANDLE) ---
+
             Center(
               child: Container(
-                width: 48, height: 5,
-                decoration: BoxDecoration(color: Colors.grey[400], borderRadius: BorderRadius.circular(10)),
+                width: 48,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.grey[400],
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
             ),
+
             const SizedBox(height: 24),
 
-            // --- 2. CHUYỂN ĐỔI THU NHẬP / CHI TIÊU ---
-            _buildToggleSwitch(isDarkMode),
+            _buildToggleSwitch(isDarkMode, loc),
+
             const SizedBox(height: 32),
 
-            // --- 3. NHẬP SỐ TIỀN (AMOUNT INPUT) ---
-            _buildLabel('Số tiền / 금액 (Amount)', isDarkMode),
+            _buildLabel(loc.amount, isDarkMode),
+
             _buildAmountInput(isDarkMode),
+
             const SizedBox(height: 24),
 
-            // --- 4. CHỌN DANH MỤC (CATEGORY SELECTOR) ---
-            _buildLabel('Danh mục / 카테고리 (Category)', isDarkMode),
-            _buildCategoryGrid(isDarkMode),
+            _buildLabel(loc.category, isDarkMode),
+
+            _buildCategoryGrid(isDarkMode, loc),
+
             const SizedBox(height: 24),
 
-            // --- 5. GHI CHÚ (NOTES) ---
-            _buildLabel('Ghi chú / 메모 (Notes)', isDarkMode),
-            _buildNotesInput(isDarkMode),
+            _buildLabel(loc.date, isDarkMode),
+
+            _buildDatePicker(isDarkMode),
+
+            const SizedBox(height: 24),
+
+            _buildLabel(loc.notes, isDarkMode),
+
+            _buildNotesInput(isDarkMode, loc),
+
             const SizedBox(height: 32),
 
-            // --- 6. NÚT LƯU (SAVE BUTTON - FIXED SHADOWCOLOR) ---
             SizedBox(
+
               width: double.infinity,
               height: 56,
+
               child: ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                // ✅ Sửa lỗi shadowColor bằng cách dùng AppStyles đã định nghĩa
+
+                onPressed: _isLoading ? null : _saveTransaction,
+
                 style: AppStyles.primaryButtonStyle,
-                child: const Text('Lưu giao dịch / 저장 (Save)'),
+
+                child: _isLoading
+                    ? const CircularProgressIndicator(
+                    color: Colors.white)
+                    : Text(loc.saveTransaction),
+
               ),
             ),
+
             const SizedBox(height: 12),
+
           ],
         ),
       ),
     );
   }
 
-  // --- CÁC THÀNH PHẦN WIDGET CHI TIẾT ---
+  Widget _buildToggleSwitch(bool isDarkMode, AppLocalizations loc) {
 
-  Widget _buildToggleSwitch(bool isDarkMode) {
     return Container(
+
       padding: const EdgeInsets.all(4),
+
       decoration: BoxDecoration(
         color: isDarkMode ? AppColors.cardDark : Colors.grey[200],
         borderRadius: BorderRadius.circular(16),
       ),
+
       child: Row(
+
         children: [
-          _buildToggleButton('Chi tiêu / 지출', _isExpense, () => setState(() => _isExpense = true)),
-          _buildToggleButton('Thu nhập / 수입', !_isExpense, () => setState(() => _isExpense = false)),
+
+          _buildToggleButton(
+            loc.expenses,
+            _isExpense,
+                () => setState(() => _isExpense = true),
+          ),
+
+          _buildToggleButton(
+            loc.income,
+            !_isExpense,
+                () => setState(() => _isExpense = false),
+          ),
+
         ],
       ),
     );
   }
 
-  Widget _buildToggleButton(String label, bool isActive, VoidCallback onTap) {
+  Widget _buildToggleButton(
+      String label,
+      bool isActive,
+      VoidCallback onTap) {
+
     return Expanded(
+
       child: GestureDetector(
+
         onTap: onTap,
+
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
+
+          padding:
+          const EdgeInsets.symmetric(vertical: 12),
+
           decoration: BoxDecoration(
-            color: isActive ? AppColors.primary : Colors.transparent,
+            color: isActive
+                ? AppColors.primary
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
           ),
+
           child: Center(
+
             child: Text(
+
               label,
+
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                color: isActive ? Colors.black : Colors.grey,
+                color:
+                isActive ? Colors.black : Colors.grey,
               ),
             ),
           ),
@@ -119,12 +266,19 @@ class _AddTransactionBottomSheetState extends State<AddTransactionBottomSheet> {
   }
 
   Widget _buildLabel(String text, bool isDarkMode) {
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0, left: 4),
+
+      padding: const EdgeInsets.only(bottom: 8, left: 4),
+
       child: Text(
+
         text,
+
         style: TextStyle(
-          color: isDarkMode ? AppColors.textMint : Colors.grey[600],
+          color: isDarkMode
+              ? AppColors.textMint
+              : Colors.grey[600],
           fontSize: 12,
           fontWeight: FontWeight.bold,
         ),
@@ -133,50 +287,134 @@ class _AddTransactionBottomSheetState extends State<AddTransactionBottomSheet> {
   }
 
   Widget _buildAmountInput(bool isDarkMode) {
+
     return TextField(
+
+      controller: _amountController,
+
       keyboardType: TextInputType.number,
-      autofocus: true,
-      style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+
+      style: const TextStyle(
+        fontSize: 32,
+        fontWeight: FontWeight.bold,
+      ),
+
       decoration: InputDecoration(
+
         hintText: '0',
+
         suffixText: 'VND',
-        suffixStyle: const TextStyle(color: AppColors.primary, fontSize: 18, fontWeight: FontWeight.bold),
+
         filled: true,
-        fillColor: isDarkMode ? AppColors.inputBgDark : Colors.white,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
+
+        fillColor: isDarkMode
+            ? AppColors.inputBgDark
+            : Colors.white,
+
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
+        ),
+
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(
+              color: AppColors.primary, width: 2),
+        ),
       ),
     );
   }
 
-  Widget _buildCategoryGrid(bool isDarkMode) {
+  Widget _buildCategoryGrid(
+      bool isDarkMode,
+      AppLocalizations loc) {
+
     final categories = [
-      {'icon': Icons.restaurant, 'name': 'Ăn uống'},
-      {'icon': Icons.shopping_bag, 'name': 'Mua sắm'},
-      {'icon': Icons.directions_bus, 'name': 'Di chuyển'},
-      {'icon': Icons.computer, 'name': 'Thiết bị IT'},
+
+      {'icon': Icons.restaurant, 'key': 'food', 'label': loc.food},
+
+      {'icon': Icons.shopping_bag, 'key': 'shopping', 'label': loc.shopping},
+
+      {'icon': Icons.directions_bus, 'key': 'transport', 'label': loc.transport},
+
+      {'icon': Icons.computer, 'key': 'tech', 'label': loc.tech},
+
     ];
 
     return Wrap(
+
       spacing: 12,
+
       runSpacing: 12,
+
       children: categories.map((cat) {
-        bool isSelected = _selectedCategory == cat['name'];
+
+        bool isSelected =
+            _selectedCategory == cat['key'];
+
         return GestureDetector(
-          onTap: () => setState(() => _selectedCategory = cat['name'] as String),
+
+          onTap: () {
+
+            setState(() {
+              _selectedCategory =
+              cat['key'] as String;
+            });
+
+          },
+
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+
+            padding: const EdgeInsets.symmetric(
+                horizontal: 16, vertical: 10),
+
             decoration: BoxDecoration(
-              color: isSelected ? AppColors.primary.withOpacity(0.15) : (isDarkMode ? AppColors.cardDark : Colors.white),
+
+              color: isSelected
+                  ? AppColors.primary.withOpacity(0.15)
+                  : (isDarkMode
+                  ? AppColors.cardDark
+                  : Colors.white),
+
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: isSelected ? AppColors.primary : (isDarkMode ? Colors.white10 : Colors.grey[300]!)),
+
+              border: Border.all(
+                color: isSelected
+                    ? AppColors.primary
+                    : (isDarkMode
+                    ? Colors.white10
+                    : Colors.grey[300]!),
+              ),
             ),
+
             child: Row(
+
               mainAxisSize: MainAxisSize.min,
+
               children: [
-                Icon(cat['icon'] as IconData, size: 18, color: isSelected ? AppColors.primary : Colors.grey),
+
+                Icon(
+                  cat['icon'] as IconData,
+                  size: 18,
+                  color: isSelected
+                      ? AppColors.primary
+                      : Colors.grey,
+                ),
+
                 const SizedBox(width: 8),
-                Text(cat['name'] as String, style: TextStyle(color: isSelected ? AppColors.primary : Colors.grey, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+
+                Text(
+                  cat['label'] as String,
+                  style: TextStyle(
+                    color: isSelected
+                        ? AppColors.primary
+                        : Colors.grey,
+                    fontWeight: isSelected
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                  ),
+                ),
+
               ],
             ),
           ),
@@ -185,14 +423,73 @@ class _AddTransactionBottomSheetState extends State<AddTransactionBottomSheet> {
     );
   }
 
-  Widget _buildNotesInput(bool isDarkMode) {
+  Widget _buildDatePicker(bool isDarkMode) {
+
+    return GestureDetector(
+
+      onTap: _pickDate,
+
+      child: Container(
+
+        padding: const EdgeInsets.symmetric(
+            horizontal: 16, vertical: 16),
+
+        decoration: BoxDecoration(
+
+          color: isDarkMode
+              ? AppColors.inputBgDark
+              : Colors.white,
+
+          borderRadius: BorderRadius.circular(16),
+
+          border: Border.all(
+            color: Colors.grey.shade300,
+          ),
+        ),
+
+        child: Row(
+
+          mainAxisAlignment:
+          MainAxisAlignment.spaceBetween,
+
+          children: [
+
+            Text(
+              "${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}",
+            ),
+
+            const Icon(Icons.calendar_today),
+
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNotesInput(
+      bool isDarkMode,
+      AppLocalizations loc) {
+
     return TextField(
+
+      controller: _noteController,
+
       maxLines: 2,
+
       decoration: InputDecoration(
-        hintText: 'Thêm nỗi lo tài chính / tài chính 고민 추가...', // Sử dụng 고민 theo yêu cầu
+
+        hintText: loc.addNote,
+
         filled: true,
-        fillColor: isDarkMode ? AppColors.inputBgDark : Colors.white,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+
+        fillColor: isDarkMode
+            ? AppColors.inputBgDark
+            : Colors.white,
+
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
+        ),
       ),
     );
   }

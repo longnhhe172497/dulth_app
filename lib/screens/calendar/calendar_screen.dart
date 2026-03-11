@@ -1,225 +1,469 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 import '../../constants.dart';
+import '../../l10n/app_localizations.dart';
 
 class TransactionCalendarScreen extends StatefulWidget {
   const TransactionCalendarScreen({super.key});
 
   @override
-  State<TransactionCalendarScreen> createState() => _TransactionCalendarScreenState();
+  State<TransactionCalendarScreen> createState() =>
+      _TransactionCalendarScreenState();
 }
 
-class _TransactionCalendarScreenState extends State<TransactionCalendarScreen> {
+class _TransactionCalendarScreenState
+    extends State<TransactionCalendarScreen> {
+
+  final String uid = FirebaseAuth.instance.currentUser!.uid;
+
   DateTime _focusedDay = DateTime.now();
+  DateTime _selectedDay = DateTime.now();
 
   @override
   Widget build(BuildContext context) {
-    bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    final loc = AppLocalizations.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDarkMode ? AppColors.backgroundDark : AppColors.backgroundLight,
+
+      backgroundColor:
+      isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
+
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
         elevation: 0,
-        title: const Text(
-          'Lịch giao dịch / giao dịch 달력',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-        ),
         centerTitle: true,
-        actions: [
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.filter_list, color: AppColors.primary),
-          ),
-        ],
+        backgroundColor: Colors.transparent,
+        title: Text(
+          loc.calendarTitle,
+          style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 18),
+        ),
       ),
+
       body: Column(
         children: [
-          // --- 1. Calendar Header / Month Selector ---
-          _buildMonthHeader(isDarkMode),
 
-          // --- 2. Weekdays Header ---
-          _buildWeekdaysRow(),
+          _monthHeader(loc),
 
-          // --- 3. Calendar Grid ---
-          _buildCalendarGrid(isDarkMode),
+          _weekRow(loc),
 
-          const SizedBox(height: 16),
-
-          // --- 4. Daily Transactions List ---
           Expanded(
-            child: Container(
-              padding: const EdgeInsets.only(top: 24),
-              decoration: BoxDecoration(
-                color: isDarkMode ? AppColors.cardDark.withOpacity(0.5) : Colors.white,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-              ),
-              child: _buildDailyTransactionList(isDarkMode),
-            ),
+            flex: 3,
+            child: _calendarGrid(isDark),
           ),
+
+          Expanded(
+            flex: 4,
+            child: _transactionList(isDark, loc),
+          ),
+
         ],
       ),
     );
   }
 
-  // --- WIDGET COMPONENTS ---
+  /// MONTH HEADER
 
-  Widget _buildMonthHeader(bool isDarkMode) {
+  Widget _monthHeader(AppLocalizations loc) {
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+
         children: [
-          const Text(
-            'Tháng 10, 2023',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+
+          Text(
+            "${loc.month} ${_focusedDay.month}, ${_focusedDay.year}",
+            style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold),
           ),
+
           Row(
             children: [
-              _buildSmallIconButton(Icons.chevron_left, isDarkMode),
+
+              _iconBtn(Icons.chevron_left, () {
+
+                setState(() {
+                  _focusedDay = DateTime(
+                      _focusedDay.year,
+                      _focusedDay.month - 1);
+                });
+
+              }),
+
               const SizedBox(width: 8),
-              _buildSmallIconButton(Icons.chevron_right, isDarkMode),
+
+              _iconBtn(Icons.chevron_right, () {
+
+                setState(() {
+                  _focusedDay = DateTime(
+                      _focusedDay.year,
+                      _focusedDay.month + 1);
+                });
+
+              }),
+
             ],
-          ),
+          )
         ],
       ),
     );
   }
 
-  Widget _buildSmallIconButton(IconData icon, bool isDarkMode) {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: isDarkMode ? AppColors.borderColor.withOpacity(0.2) : Colors.grey[200],
-        shape: BoxShape.circle,
+  Widget _iconBtn(IconData icon, VoidCallback onTap) {
+
+    return GestureDetector(
+
+      onTap: onTap,
+
+      child: Container(
+        padding: const EdgeInsets.all(6),
+
+        decoration: BoxDecoration(
+          color: Colors.grey[200],
+          shape: BoxShape.circle,
+        ),
+
+        child: Icon(icon, size: 20),
       ),
-      child: Icon(icon, size: 20),
     );
   }
 
-  Widget _buildWeekdaysRow() {
-    final days = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+  /// WEEK HEADER
+
+  Widget _weekRow(AppLocalizations loc) {
+
+    final days = [
+      loc.sun,
+      loc.mon,
+      loc.tue,
+      loc.wed,
+      loc.thu,
+      loc.fri,
+      loc.sat
+    ];
+
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16),
+      padding: const EdgeInsets.symmetric(vertical: 8),
+
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: days.map((day) => Text(
-            day,
-            style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, fontSize: 12)
-        )).toList(),
+
+        children: days.map((d) {
+
+          return Text(
+            d,
+            style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+                color: Colors.grey),
+          );
+
+        }).toList(),
       ),
     );
   }
 
-  Widget _buildCalendarGrid(bool isDarkMode) {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 7,
-        mainAxisSpacing: 10,
-        crossAxisSpacing: 10,
-      ),
-      itemCount: 31,
-      itemBuilder: (context, index) {
-        int day = index + 1;
-        bool isSelected = day == 24;
-        bool hasIncome = day == 10 || day == 24;
-        bool hasExpense = day == 15 || day == 24;
+  /// CALENDAR GRID
 
-        return Column(
-          children: [
-            Container(
-              height: 36,
-              width: 36,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: isSelected ? AppColors.primary : Colors.transparent,
-                shape: BoxShape.circle,
-              ),
-              child: Text(
-                '$day',
-                style: TextStyle(
-                  color: isSelected ? Colors.black : (isDarkMode ? Colors.white : Colors.black),
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+  Widget _calendarGrid(bool isDark) {
+
+    int daysInMonth =
+    DateUtils.getDaysInMonth(_focusedDay.year, _focusedDay.month);
+
+    DateTime firstDay =
+    DateTime(_focusedDay.year, _focusedDay.month, 1);
+
+    int startWeekday = firstDay.weekday % 7;
+
+    return StreamBuilder<QuerySnapshot>(
+
+      stream: FirebaseFirestore.instance
+          .collection("users")
+          .doc(uid)
+          .collection("transactions")
+          .where("month", isEqualTo: _focusedDay.month)
+          .where("year", isEqualTo: _focusedDay.year)
+          .snapshots(),
+
+      builder: (context, snapshot) {
+
+        Map<int, double> dailyTotal = {};
+        Set<int> txDays = {};
+
+        if (snapshot.hasData) {
+
+          for (var doc in snapshot.data!.docs) {
+
+            final data = doc.data() as Map<String, dynamic>;
+
+            int day = data["day"];
+            double amount = (data["amount"] ?? 0).toDouble();
+
+            txDays.add(day);
+
+            dailyTotal[day] =
+                (dailyTotal[day] ?? 0) + amount;
+          }
+        }
+
+        return GridView.builder(
+
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+
+          gridDelegate:
+          const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 7,
+            mainAxisSpacing: 6,
+            crossAxisSpacing: 6,
+          ),
+
+          itemCount: daysInMonth + startWeekday,
+
+          itemBuilder: (context, index) {
+
+            if (index < startWeekday) {
+              return const SizedBox();
+            }
+
+            int day = index - startWeekday + 1;
+
+            DateTime date =
+            DateTime(_focusedDay.year, _focusedDay.month, day);
+
+            bool selected =
+            DateUtils.isSameDay(date, _selectedDay);
+
+            return GestureDetector(
+
+              onTap: () {
+
+                setState(() {
+                  _selectedDay = date;
+                });
+
+              },
+
+              child: Container(
+
+                decoration: BoxDecoration(
+
+                  color: selected
+                      ? AppColors.primary
+                      : Colors.transparent,
+
+                  borderRadius: BorderRadius.circular(10),
+
+                ),
+
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+
+                  children: [
+
+                    Text(
+                      "$day",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: selected
+                            ? Colors.black
+                            : (isDark ? Colors.white : Colors.black),
+                      ),
+                    ),
+
+                    if (dailyTotal.containsKey(day))
+                      Text(
+                        "₫${dailyTotal[day]!.toStringAsFixed(0)}",
+                        style: const TextStyle(
+                            fontSize: 9,
+                            color: Colors.red),
+                      ),
+
+                    if (txDays.contains(day))
+                      Container(
+                        margin: const EdgeInsets.only(top: 2),
+                        width: 4,
+                        height: 4,
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                  ],
                 ),
               ),
-            ),
-            const SizedBox(height: 2),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (hasIncome) Container(width: 2, height: 2, decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle)),
-                if (hasIncome && hasExpense) const SizedBox(width: 2),
-                if (hasExpense) Container(width: 2, height: 2, decoration: const BoxDecoration(color: Colors.orange, shape: BoxShape.circle)),
-              ],
-            )
-          ],
+            );
+          },
         );
       },
     );
   }
 
-  Widget _buildDailyTransactionList(bool isDarkMode) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 24),
-          child: Text(
-            '24 Tháng 10 / 10월 24일',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textMint),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Expanded(
-          child: ListView(
+  /// TRANSACTION LIST
+
+  Widget _transactionList(bool isDark, AppLocalizations loc) {
+
+    return Container(
+
+      padding: const EdgeInsets.only(top: 16),
+
+      decoration: BoxDecoration(
+
+        color: isDark
+            ? AppColors.cardDark
+            : Colors.white,
+
+        borderRadius:
+        const BorderRadius.vertical(top: Radius.circular(28)),
+
+      ),
+
+      child: StreamBuilder<QuerySnapshot>(
+
+        stream: FirebaseFirestore.instance
+            .collection("users")
+            .doc(uid)
+            .collection("transactions")
+            .where("day", isEqualTo: _selectedDay.day)
+            .where("month", isEqualTo: _selectedDay.month)
+            .where("year", isEqualTo: _selectedDay.year)
+            .orderBy("createdAt", descending: true)
+            .snapshots(),
+
+        builder: (context, snapshot) {
+
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final docs = snapshot.data!.docs;
+
+          if (docs.isEmpty) {
+            return Center(child: Text(loc.noTransaction));
+          }
+
+          return ListView.builder(
+
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            children: [
-              _buildTransactionItem(Icons.restaurant, 'Lotteria', '12:45 PM • Ăn uống', '- ₫ 125.000', isDarkMode),
-              _buildTransactionItem(Icons.payments, 'Lương / 급여', '09:00 AM • Thu nhập', '+ ₫ 15.000.000', isDarkMode, isIncome: true),
-              _buildTransactionItem(Icons.shopping_bag, 'Uniqlo', '06:30 PM • Mua sắm', '- ₫ 850.000', isDarkMode),
-            ],
-          ),
-        ),
-      ],
+
+            itemCount: docs.length,
+
+            itemBuilder: (context, index) {
+
+              final data = docs[index].data() as Map<String, dynamic>;
+
+              return _transactionItem(
+                  data,
+                  isDark);
+            },
+          );
+        },
+      ),
     );
   }
 
-  Widget _buildTransactionItem(IconData icon, String title, String time, String amount, bool isDarkMode, {bool isIncome = false}) {
+  /// TRANSACTION ITEM
+
+  Widget _transactionItem(Map<String, dynamic> data, bool isDark) {
+
+    double amount = (data["amount"] ?? 0).toDouble();
+    String type = data["type"] ?? "";
+    String category = data["category"] ?? "";
+    String note = data["note"] ?? "";
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+
+      margin: const EdgeInsets.only(bottom: 10),
+
       padding: const EdgeInsets.all(12),
+
       decoration: BoxDecoration(
-        color: isDarkMode ? AppColors.backgroundDark.withOpacity(0.5) : Colors.grey[100],
-        borderRadius: BorderRadius.circular(16),
+        color: isDark ? AppColors.backgroundDark : Colors.grey[100],
+        borderRadius: BorderRadius.circular(14),
       ),
+
       child: Row(
         children: [
+
           Container(
             padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
-            child: Icon(icon, color: AppColors.primary, size: 20),
+
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+
+            child: Icon(
+              _iconByCategory(category),
+              size: 20,
+              color: AppColors.primary,
+            ),
           ),
+
           const SizedBox(width: 12),
+
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                Text(time, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+
+                Text(
+                  category,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold),
+                ),
+
+                Text(
+                  note,
+                  style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey),
+                ),
+
               ],
             ),
           ),
+
           Text(
-            amount,
+            "₫${amount.toStringAsFixed(0)}",
             style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: isIncome ? AppColors.primary : (isDarkMode ? Colors.white : Colors.black)
+              fontWeight: FontWeight.bold,
+              color: type == "income"
+                  ? Colors.green
+                  : Colors.red,
             ),
-          ),
+          )
         ],
       ),
     );
+  }
+
+  IconData _iconByCategory(String c) {
+
+    switch (c) {
+
+      case "food":
+        return Icons.restaurant;
+
+      case "shopping":
+        return Icons.shopping_bag;
+
+      case "transport":
+        return Icons.directions_bus;
+
+      case "tech":
+        return Icons.computer;
+
+      default:
+        return Icons.account_balance_wallet;
+    }
   }
 }

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../../constants.dart';
 import '../../services/auth_service.dart';
+import '../../l10n/app_localizations.dart';
 import 'edit_profile_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -10,10 +12,11 @@ class ProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context);
     final user = FirebaseAuth.instance.currentUser;
 
     if (user == null) {
-      return const Center(child: Text("Chưa đăng nhập"));
+      return const Center(child: Text("Not logged in"));
     }
 
     final bool isDarkMode =
@@ -23,41 +26,36 @@ class ProfileScreen extends StatelessWidget {
       backgroundColor: isDarkMode
           ? AppColors.backgroundDark
           : AppColors.backgroundLight,
+
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
-        title: const Text(
-          'Hồ sơ / 프로필',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Text(
+          loc.profile,
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
 
-      // 🔥 REALTIME FIRESTORE LISTENER
       body: StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
             .snapshots(),
         builder: (context, snapshot) {
-          // Loading
           if (snapshot.connectionState ==
               ConnectionState.waiting) {
             return const Center(
                 child: CircularProgressIndicator());
           }
 
-          // Không có document
-          if (!snapshot.hasData ||
-              !snapshot.data!.exists) {
+          if (!snapshot.hasData || !snapshot.data!.exists) {
             return const Center(
-                child: Text("Không tìm thấy dữ liệu"));
+                child: Text("No data found"));
           }
 
-          // Lấy data an toàn
-          final doc = snapshot.data!;
           final data =
-              doc.data() as Map<String, dynamic>? ?? {};
+              snapshot.data!.data() as Map<String, dynamic>? ?? {};
 
           final String fullName =
               data['fullName'] ?? 'No Name';
@@ -68,8 +66,10 @@ class ProfileScreen extends StatelessWidget {
           final String avatar =
               data['avatar'] ??
                   'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=200';
+
           final int balance =
               data['balance'] ?? 0;
+
           final String currency =
               data['currency'] ?? 'VND';
 
@@ -78,27 +78,22 @@ class ProfileScreen extends StatelessWidget {
               children: [
                 const SizedBox(height: 30),
 
-                // ===== AVATAR =====
                 CircleAvatar(
                   radius: 50,
-                  backgroundImage:
-                  NetworkImage(avatar),
+                  backgroundImage: NetworkImage(avatar),
                 ),
 
                 const SizedBox(height: 16),
 
-                // ===== NAME =====
                 Text(
                   fullName,
                   style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold),
                 ),
 
                 const SizedBox(height: 4),
 
-                // ===== EMAIL =====
                 Text(
                   email,
                   style: TextStyle(
@@ -110,7 +105,6 @@ class ProfileScreen extends StatelessWidget {
 
                 const SizedBox(height: 4),
 
-                // ===== MAJOR =====
                 Text(
                   major,
                   style: TextStyle(
@@ -125,10 +119,8 @@ class ProfileScreen extends StatelessWidget {
                 // ===== BALANCE CARD =====
                 Container(
                   margin:
-                  const EdgeInsets.symmetric(
-                      horizontal: 24),
-                  padding:
-                  const EdgeInsets.all(20),
+                  const EdgeInsets.symmetric(horizontal: 24),
+                  padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     color: isDarkMode
                         ? AppColors.cardDark
@@ -146,20 +138,14 @@ class ProfileScreen extends StatelessWidget {
                   ),
                   child: Column(
                     children: [
-                      const Text(
-                        "Số dư hiện tại",
-                        style: TextStyle(
-                            fontSize: 14),
-                      ),
+                      Text(loc.balance),
                       const SizedBox(height: 8),
                       Text(
                         "$balance $currency",
                         style: const TextStyle(
                           fontSize: 24,
-                          fontWeight:
-                          FontWeight.bold,
-                          color:
-                          AppColors.primary,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
                         ),
                       ),
                     ],
@@ -168,17 +154,12 @@ class ProfileScreen extends StatelessWidget {
 
                 const SizedBox(height: 30),
 
-                // ===== ACCOUNT SECTION =====
-                _sectionLabel(
-                    "Tài khoản / 계정",
-                    isDarkMode),
+                _sectionLabel(loc.account, isDarkMode),
 
                 _settingTile(
                   icon: Icons.person_outline,
-                  title:
-                  "Chỉnh sửa hồ sơ",
-                  isDarkMode:
-                  isDarkMode,
+                  title: loc.editProfile,
+                  isDarkMode: isDarkMode,
                   onTap: () {
                     Navigator.push(
                       context,
@@ -189,69 +170,54 @@ class ProfileScreen extends StatelessWidget {
                     );
                   },
                 ),
-                // ===== LANGUAGE SETTING =====
+
                 _settingTile(
                   icon: Icons.language,
-                  title: "Ngôn ngữ / Language",
+                  title: loc.language,
                   isDarkMode: isDarkMode,
                   onTap: () {
                     _showLanguageSelector(
-                      context,
-                      user.uid,
-                      data['language'] ?? "vi",
-                    );
+                        context,
+                        user.uid,
+                        data['language'] ?? "vi");
                   },
                 ),
 
-// ===== DARK MODE SETTING =====
                 SwitchListTile(
                   secondary: const Icon(Icons.dark_mode,
                       color: AppColors.primary),
-                  title: const Text("Chế độ tối / Dark Mode"),
+                  title: Text(loc.darkMode),
                   value: data['darkMode'] ?? false,
                   onChanged: (value) async {
                     await FirebaseFirestore.instance
                         .collection('users')
                         .doc(user.uid)
-                        .update({
-                      "darkMode": value
-                    });
+                        .update({"darkMode": value});
                   },
                 ),
 
                 const SizedBox(height: 24),
 
-                // ===== LOGOUT =====
                 Padding(
-                  padding:
-                  const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(16),
                   child: SizedBox(
                     width: double.infinity,
                     height: 50,
                     child: ElevatedButton.icon(
-                      icon:
-                      const Icon(Icons.logout),
-                      label:
-                      const Text("Đăng xuất"),
-                      style:
-                      ElevatedButton.styleFrom(
+                      icon: const Icon(Icons.logout),
+                      label: Text(loc.logout),
+                      style: ElevatedButton.styleFrom(
                         backgroundColor:
-                        Colors.red
-                            .withOpacity(0.1),
-                        foregroundColor:
-                        Colors.red,
+                        Colors.red.withOpacity(0.1),
+                        foregroundColor: Colors.red,
                         elevation: 0,
-                        shape:
-                        RoundedRectangleBorder(
+                        shape: RoundedRectangleBorder(
                           borderRadius:
-                          BorderRadius.circular(
-                              16),
+                          BorderRadius.circular(16),
                         ),
                       ),
                       onPressed: () async {
-                        await AuthService()
-                            .logout();
-                        // AuthWrapper tự chuyển về login
+                        await AuthService().logout();
                       },
                     ),
                   ),
@@ -266,31 +232,23 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  // ===== SECTION LABEL =====
-  Widget _sectionLabel(
-      String label,
-      bool isDarkMode) {
+  Widget _sectionLabel(String label, bool isDarkMode) {
     return Container(
       width: double.infinity,
-      padding:
-      const EdgeInsets.symmetric(
-          horizontal: 20,
-          vertical: 8),
+      padding: const EdgeInsets.symmetric(
+          horizontal: 20, vertical: 8),
       child: Text(
         label.toUpperCase(),
         style: TextStyle(
-          color: isDarkMode
-              ? AppColors.textMint
-              : Colors.grey,
+          color:
+          isDarkMode ? AppColors.textMint : Colors.grey,
           fontSize: 11,
-          fontWeight:
-          FontWeight.bold,
+          fontWeight: FontWeight.bold,
         ),
       ),
     );
   }
 
-  // ===== SETTING TILE =====
   Widget _settingTile({
     required IconData icon,
     required String title,
@@ -299,26 +257,21 @@ class ProfileScreen extends StatelessWidget {
   }) {
     return ListTile(
       onTap: onTap,
-      leading: Icon(
-        icon,
-        color: AppColors.primary,
-      ),
+      leading: Icon(icon, color: AppColors.primary),
       title: Text(title),
-      trailing:
-      const Icon(Icons.chevron_right),
+      trailing: const Icon(Icons.chevron_right),
     );
   }
+
   void _showLanguageSelector(
       BuildContext context,
       String uid,
-      String currentLang,
-      ) {
+      String currentLang) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(20),
-        ),
+        borderRadius:
+        BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
         return Padding(
@@ -327,15 +280,13 @@ class ProfileScreen extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text(
-                "Chọn ngôn ngữ / Select Language",
+                "Select Language",
                 style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 20),
 
-              // ===== VIETNAMESE =====
               ListTile(
                 title: const Text("Tiếng Việt"),
                 trailing: currentLang == "vi"
@@ -346,15 +297,11 @@ class ProfileScreen extends StatelessWidget {
                   await FirebaseFirestore.instance
                       .collection('users')
                       .doc(uid)
-                      .update({
-                    "language": "vi"
-                  });
-
+                      .update({"language": "vi"});
                   Navigator.pop(context);
                 },
               ),
 
-              // ===== ENGLISH =====
               ListTile(
                 title: const Text("English"),
                 trailing: currentLang == "en"
@@ -365,10 +312,7 @@ class ProfileScreen extends StatelessWidget {
                   await FirebaseFirestore.instance
                       .collection('users')
                       .doc(uid)
-                      .update({
-                    "language": "en"
-                  });
-
+                      .update({"language": "en"});
                   Navigator.pop(context);
                 },
               ),
