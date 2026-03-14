@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../constants.dart';
-import 'login_screen.dart';
+import '../../main.dart';
+
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -18,7 +19,9 @@ class _SplashScreenState extends State<SplashScreen> {
       if (mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
+          MaterialPageRoute(
+            builder: (context) => const AuthWrapper(),
+          ),
         );
       }
     });
@@ -87,7 +90,7 @@ class _SplashScreenState extends State<SplashScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              '개인 tài chính quản lý',
+              'Tài chính quản lý',
               style: TextStyle(
                 color: isDarkMode ? AppColors.textMint.withOpacity(0.7) : Colors.grey[500],
                 fontSize: 12,

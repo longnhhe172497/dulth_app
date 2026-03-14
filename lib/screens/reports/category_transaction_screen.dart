@@ -1,203 +1,202 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:intl/intl.dart';
+
 import '../../constants.dart';
+import '../../l10n/app_localizations.dart';
 
 class CategoryTransactionScreen extends StatelessWidget {
-  const CategoryTransactionScreen({super.key});
+
+  final String category;
+  final int month;
+  final int year;
+
+  const CategoryTransactionScreen({
+    super.key,
+    required this.category,
+    required this.month,
+    required this.year,
+  });
 
   @override
   Widget build(BuildContext context) {
-    bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    final lang = AppLocalizations.of(context)!;
+    final uid = FirebaseAuth.instance.currentUser!.uid;
 
     return Scaffold(
-      backgroundColor: isDarkMode ? AppColors.backgroundDark : AppColors.backgroundLight,
+
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new, color: isDarkMode ? Colors.white : Colors.black, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Chi tiết hạng mục / 카테고리 상세',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-        ),
+        title: Text("$category - $month/$year"),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // --- 1. TỔNG QUAN CHI TIÊU HẠNG MỤC (CATEGORY SUMMARY) ---
-            _buildCategoryHeader(isDarkMode),
 
-            // --- 2. BIỂU ĐỒ XU HƯỚNG NHỎ (MINI TREND) ---
-            _buildMiniTrendSection(isDarkMode),
+      body: StreamBuilder<QuerySnapshot>(
 
-            // --- 3. DANH SÁCH GIAO DIỆN (TRANSACTION LIST) ---
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Lịch sử / 거래 내역', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                  Text('Tháng 10', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
-                ],
-              ),
-            ),
+        stream: FirebaseFirestore.instance
+            .collection("users")
+            .doc(uid)
+            .collection("transactions")
+            .where("category", isEqualTo: category)
+            .where("month", isEqualTo: month)
+            .where("year", isEqualTo: year)
+            .orderBy("date", descending: true)
+            .snapshots(),
 
-            _buildTransactionList(isDarkMode),
+        builder: (context, snapshot) {
 
-            const SizedBox(height: 32),
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-            // Nút giải quyết nỗi lo (Sử dụng từ "고민" theo yêu cầu)
-            _buildAdviceButton(isDarkMode),
+          final docs = snapshot.data!.docs;
 
-            const SizedBox(height: 100),
-          ],
-        ),
-      ),
-    );
-  }
+          if (docs.isEmpty) {
+            return Center(child: Text(lang.noTransaction));
+          }
 
-  // --- CÁC THÀNH PHẦN WIDGET CHI TIẾT ---
+          return ListView.builder(
 
-  Widget _buildCategoryHeader(bool isDarkMode) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 32),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.15),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.restaurant, color: AppColors.primary, size: 40),
-          ),
-          const SizedBox(height: 16),
-          const Text('Ăn uống / 식비', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          const Text(
-            '₫ 16.020.000',
-            style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: AppColors.primary),
-          ),
-          Text(
-            '₩ 865,000 equiv.',
-            style: TextStyle(color: isDarkMode ? AppColors.textMint : Colors.grey, fontSize: 14),
-          ),
-        ],
-      ),
-    );
-  }
+            padding: const EdgeInsets.all(16),
 
-  Widget _buildMiniTrendSection(bool isDarkMode) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isDarkMode ? AppColors.cardDark : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: isDarkMode ? AppColors.borderColor.withOpacity(0.2) : Colors.grey[200]!),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('So với tháng trước', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                const SizedBox(height: 4),
-                Row(
-                  children: const [
-                    Icon(Icons.trending_up, color: Colors.red, size: 16),
-                    SizedBox(width: 4),
-                    Text('+12%', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+            itemCount: docs.length,
+
+            itemBuilder: (context, index) {
+
+              final data =
+              docs[index].data() as Map<String, dynamic>;
+
+              final amount =
+              (data["amount"] as num).toDouble();
+
+              final note = data["note"] ?? "";
+
+              final type = data["type"];
+
+              final timestamp = data["date"] as Timestamp?;
+
+              final date = timestamp != null
+                  ? DateFormat("dd/MM/yyyy")
+                  .format(timestamp.toDate())
+                  : "";
+
+              final color =
+              type == "income"
+                  ? Colors.green
+                  : Colors.red;
+
+              return Container(
+
+                margin: const EdgeInsets.only(bottom: 12),
+
+                decoration: BoxDecoration(
+                  color: Theme.of(context).cardColor,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: const [
+                    BoxShadow(
+                      blurRadius: 6,
+                      color: Colors.black12,
+                    )
                   ],
                 ),
-              ],
-            ),
-            _buildMiniBarChart(),
-          ],
-        ),
+
+                child: ListTile(
+
+                  leading: CircleAvatar(
+
+                    radius: 24,
+
+                    backgroundColor:
+                    _getCategoryColor(category)
+                        .withOpacity(0.15),
+
+                    child: Icon(
+                      _getCategoryIcon(category),
+                      color: _getCategoryColor(category),
+                    ),
+                  ),
+
+                  title: Text(
+                    note.isEmpty ? category : note,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold),
+                  ),
+
+                  subtitle: Text(date),
+
+                  trailing: Text(
+
+                    NumberFormat("#,###")
+                        .format(amount) +
+                        " ₫",
+
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+              );
+            },
+          );
+        },
       ),
     );
   }
 
-  Widget _buildMiniBarChart() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: List.generate(5, (index) {
-        double height = [20.0, 35.0, 25.0, 45.0, 30.0][index];
-        return Container(
-          width: 8,
-          height: height,
-          margin: const EdgeInsets.symmetric(horizontal: 2),
-          decoration: BoxDecoration(
-            color: index == 3 ? AppColors.primary : AppColors.primary.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(4),
-          ),
-        );
-      }),
-    );
+  IconData _getCategoryIcon(String category) {
+
+    switch (category.toLowerCase()) {
+
+      case "food":
+        return Icons.restaurant;
+
+      case "transport":
+        return Icons.directions_car;
+
+      case "shopping":
+        return Icons.shopping_bag;
+
+      case "entertainment":
+        return Icons.movie;
+
+      case "health":
+        return Icons.favorite;
+
+      case "bills":
+        return Icons.receipt;
+
+      default:
+        return Icons.category;
+    }
   }
 
-  Widget _buildTransactionList(bool isDarkMode) {
-    return ListView(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      children: [
-        _buildItem(Icons.lunch_dining, 'Lotteria / 롯데리아', '24 Oct', '- ₫ 125.000', isDarkMode),
-        _buildItem(Icons.local_cafe, 'Starbucks', '22 Oct', '- ₫ 85.000', isDarkMode),
-        _buildItem(Icons.restaurant_menu, 'K-BBQ Dinner', '18 Oct', '- ₫ 1.250.000', isDarkMode),
-        _buildItem(Icons.shopping_cart, 'GS25 Mart', '15 Oct', '- ₫ 45.000', isDarkMode),
-      ],
-    );
-  }
+  Color _getCategoryColor(String category) {
 
-  Widget _buildItem(IconData icon, String title, String date, String amount, bool isDarkMode) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDarkMode ? AppColors.cardDark.withOpacity(0.5) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isDarkMode ? Colors.white10 : Colors.grey[100]!),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: AppColors.textMint, size: 20),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                Text(date, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-              ],
-            ),
-          ),
-          Text(amount, style: const TextStyle(fontWeight: FontWeight.bold)),
-        ],
-      ),
-    );
-  }
+    switch (category.toLowerCase()) {
 
-  Widget _buildAdviceButton(bool isDarkMode) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: SizedBox(
-        width: double.infinity,
-        height: 56,
-        child: ElevatedButton.icon(
-          onPressed: () {},
-          icon: const Icon(Icons.psychology_alt),
-          label: const Text('Giải quyết 고민 về chi tiêu này'),
-          // ✅ ĐÃ SỬA LỖI: shadowColor được bọc trong styleFrom thông qua AppStyles
-          style: AppStyles.primaryButtonStyle,
-        ),
-      ),
-    );
+      case "food":
+        return Colors.orange;
+
+      case "transport":
+        return Colors.blue;
+
+      case "shopping":
+        return Colors.purple;
+
+      case "entertainment":
+        return Colors.red;
+
+      case "health":
+        return Colors.pink;
+
+      case "bills":
+        return Colors.teal;
+
+      default:
+        return Colors.grey;
+    }
   }
 }

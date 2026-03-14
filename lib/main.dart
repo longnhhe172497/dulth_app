@@ -152,7 +152,7 @@ class _FinanceFlowAppState extends State<FinanceFlowApp> {
 
       themeMode: _themeMode,
 
-      home: const AuthWrapper(),
+        home: const SplashScreen(),
     );
   }
 }

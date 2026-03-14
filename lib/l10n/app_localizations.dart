@@ -49,7 +49,7 @@ class AppLocalizations {
       'logout': 'Logout',
 
       /// Account
-      'balance': 'Current Balance',
+      'balance': 'Balance',
       'account': 'Account',
       'editProfile': 'Edit Profile',
 
@@ -64,6 +64,7 @@ class AppLocalizations {
       /// Transaction Filter
       'all': 'All',
       'income': 'Income',
+      'expense': 'Expense',
       'expenses': 'Expenses',
 
       /// Features
@@ -99,6 +100,14 @@ class AppLocalizations {
       'balanceWarningMessage':
       'You cannot spend more than your available balance.',
       'ok': 'OK',
+      'cancel': 'Cancel',
+      'saveAnyway': 'Save anyway',
+
+      /// Reports
+      'monthlyReport': 'Monthly Report',
+      'totalExpense': 'Total Expense',
+      'topCategory': 'Top Category',
+      'noExpense': 'No expense this month',
     },
 
     /// ================= VIETNAMESE =================
@@ -128,7 +137,7 @@ class AppLocalizations {
       'logout': 'Đăng xuất',
 
       /// Account
-      'balance': 'Số dư hiện tại',
+      'balance': 'Số dư',
       'account': 'Tài khoản',
       'editProfile': 'Chỉnh sửa hồ sơ',
 
@@ -138,11 +147,12 @@ class AppLocalizations {
       'recentTransactions': 'Giao dịch gần đây',
       'categories': 'Danh mục',
       'addMoney': 'Nạp tiền',
-      'withdrawMoney': 'Rút tiền',
+      'withdrawMoney': 'Chi tiền',
 
       /// Transaction Filter
       'all': 'Tất cả',
       'income': 'Thu nhập',
+      'expense': 'Chi tiêu',
       'expenses': 'Chi tiêu',
 
       /// Features
@@ -178,6 +188,14 @@ class AppLocalizations {
       'balanceWarningMessage':
       'Bạn không thể chi nhiều hơn số dư hiện có.',
       'ok': 'Đồng ý',
+      'cancel': 'Hủy',
+      'saveAnyway': 'Vẫn lưu',
+
+      /// Reports
+      'monthlyReport': 'Báo cáo tháng',
+      'totalExpense': 'Tổng chi tiêu',
+      'topCategory': 'Danh mục chi nhiều nhất',
+      'noExpense': 'Không có chi tiêu tháng này',
     },
   };
 
@@ -224,6 +242,7 @@ class AppLocalizations {
   /// Transaction Filter
   String get all => _get('all');
   String get income => _get('income');
+  String get expense => _get('expense');
   String get expenses => _get('expenses');
 
   /// Features
@@ -258,6 +277,14 @@ class AppLocalizations {
   String get youTriedToSpend => _get('youTriedToSpend');
   String get balanceWarningMessage => _get('balanceWarningMessage');
   String get ok => _get('ok');
+  String get cancel => _get('cancel');
+  String get saveAnyway => _get('saveAnyway');
+
+  /// Reports
+  String get monthlyReport => _get('monthlyReport');
+  String get totalExpense => _get('totalExpense');
+  String get topCategory => _get('topCategory');
+  String get noExpense => _get('noExpense');
 }
 
 class _AppLocalizationsDelegate

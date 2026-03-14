@@ -1,230 +1,586 @@
+import 'package:dulth_app/screens/reports/category_transaction_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart'; // Đảm bảo bạn đã thêm fl_chart vào pubspec.yaml
-import '../../constants.dart';
-import 'category_transaction_screen.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:intl/intl.dart';
+
+import '../../l10n/app_localizations.dart';
 
 class MonthlyReportsScreen extends StatefulWidget {
   const MonthlyReportsScreen({super.key});
 
   @override
-  State<MonthlyReportsScreen> createState() => _MonthlyReportsScreenState();
+  State<MonthlyReportsScreen> createState() =>
+      _MonthlyReportsScreenState();
 }
 
-class _MonthlyReportsScreenState extends State<MonthlyReportsScreen> {
-  int touchedIndex = -1;
+class _MonthlyReportsScreenState extends State<MonthlyReportsScreen>
+    with SingleTickerProviderStateMixin {
+
+  Map<String,double> categoryData = {};
+
+  double income = 0;
+  double expense = 0;
+
+  DateTime selectedMonth = DateTime.now();
+
+  @override
+  void initState() {
+    super.initState();
+    loadReport();
+  }
+
+  Future<void> loadReport() async {
+
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+
+    final snapshot = await FirebaseFirestore.instance
+        .collection("users")
+        .doc(uid)
+        .collection("transactions")
+        .where("month", isEqualTo: selectedMonth.month)
+        .where("year", isEqualTo: selectedMonth.year)
+        .get();
+
+    double newIncome = 0;
+    double newExpense = 0;
+
+    Map<String,double> result = {};
+
+    for (var doc in snapshot.docs) {
+
+      final data = doc.data();
+
+      final amount = (data["amount"] as num).toDouble();
+      final type = data["type"];
+      final category = data["category"] ?? "other";
+
+      if(type == "income"){
+        newIncome += amount;
+      }else{
+
+        newExpense += amount;
+
+        result[category] =
+            (result[category] ?? 0) + amount;
+
+      }
+
+    }
+
+    setState(() {
+      income = newIncome;
+      expense = newExpense;
+      categoryData = result;
+    });
+
+  }
+
+  double get balance => income - expense;
+
+  double get totalExpense =>
+      categoryData.values.fold(0,(a,b)=>a+b);
+
+  String formatMoney(double value){
+    final f = NumberFormat("#,###");
+    return "${f.format(value)} ₫";
+  }
+
+  String get topCategory {
+
+    if(categoryData.isEmpty) return "-";
+
+    final sorted = categoryData.entries.toList()
+      ..sort((a,b)=>b.value.compareTo(a.value));
+
+    return sorted.first.key;
+
+  }
+
+  IconData getCategoryIcon(String category){
+
+    switch(category.toLowerCase()){
+
+      case "food":
+        return Icons.restaurant;
+
+      case "transport":
+        return Icons.directions_car;
+
+      case "shopping":
+        return Icons.shopping_bag;
+
+      case "bills":
+        return Icons.receipt;
+
+      case "entertainment":
+        return Icons.movie;
+
+      case "tech":
+        return Icons.devices;
+
+      default:
+        return Icons.category;
+
+    }
+
+  }
+
+  String getCategoryName(String key){
+
+    final lang = AppLocalizations.of(context)!;
+
+    switch(key){
+
+      case "food":
+        return lang.food;
+
+      case "shopping":
+        return lang.shopping;
+
+      case "transport":
+        return lang.transport;
+
+      case "tech":
+        return lang.tech;
+
+      default:
+        return key;
+
+    }
+
+  }
 
   @override
   Widget build(BuildContext context) {
-    bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    final lang = AppLocalizations.of(context)!;
 
     return Scaffold(
-      backgroundColor: isDarkMode ? AppColors.backgroundDark : AppColors.backgroundLight,
+
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: const Text(
-          'Báo cáo tháng / 월간 보고서',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
-        ),
+        title: Text(lang.monthlyReport),
         centerTitle: true,
-        actions: [
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.share_outlined, color: AppColors.primary),
-          ),
-        ],
       ),
+
       body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // --- 1. CHỌN THÁNG (MONTH PICKER) ---
-            _buildMonthSelector(isDarkMode),
 
-            // --- 2. BIỂU ĐỒ TRÒN TỔNG QUAN (PIE CHART) ---
-            _buildChartSection(isDarkMode),
-
-            // --- 3. CHI TIẾT THEO HẠNG MỤC (CATEGORY BREAKDOWN) ---
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildSectionHeader('Phân bổ chi tiêu / 지출 분포'),
-                  const SizedBox(height: 16),
-                  _buildCategoryReportItem(
-                      context,
-                      Icons.restaurant, 'Ăn uống / 식비',
-                      '16.020.000 ₫', '45%', AppColors.primary, isDarkMode
-                  ),
-                  _buildCategoryReportItem(
-                      context,
-                      Icons.computer, 'Thiết bị IT / IT 장비',
-                      '8.500.000 ₫', '25%', Colors.blue, isDarkMode
-                  ),
-                  _buildCategoryReportItem(
-                      context,
-                      Icons.school, 'Học tập (Tiếng Hàn) / 한국어 공부',
-                      '3.200.000 ₫', '15%', Colors.orange, isDarkMode
-                  ),
-                  _buildCategoryReportItem(
-                      context,
-                      Icons.more_horiz, 'Khác / 기타',
-                      '2.100.000 ₫', '15%', Colors.grey, isDarkMode
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 100), // Khoảng trống cho Bottom Nav
-          ],
-        ),
-      ),
-    );
-  }
-
-  // --- CÁC THÀNH PHẦN WIDGET CHI TIẾT ---
-
-  Widget _buildMonthSelector(bool isDarkMode) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.chevron_left, color: isDarkMode ? Colors.white54 : Colors.black54),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 24),
-            child: Text(
-              'Tháng 10, 2023',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-          ),
-          Icon(Icons.chevron_right, color: isDarkMode ? Colors.white54 : Colors.black54),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildChartSection(bool isDarkMode) {
-    return SizedBox(
-      height: 280,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          PieChart(
-            PieChartData(
-              pieTouchData: PieTouchData(
-                touchCallback: (FlTouchEvent event, pieTouchResponse) {
-                  setState(() {
-                    if (!event.isInterestedForInteractions ||
-                        pieTouchResponse == null ||
-                        pieTouchResponse.touchedSection == null) {
-                      touchedIndex = -1;
-                      return;
-                    }
-                    touchedIndex = pieTouchResponse.touchedSection!.touchedSectionIndex;
-                  });
-                },
-              ),
-              borderData: FlBorderData(show: false),
-              sectionsSpace: 4,
-              centerSpaceRadius: 70,
-              sections: _showingSections(),
-            ),
-          ),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Tổng chi',
-                style: TextStyle(color: isDarkMode ? Colors.white54 : Colors.black54, fontSize: 14),
-              ),
-              const Text(
-                '29.820.000 ₫',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  List<PieChartSectionData> _showingSections() {
-    return List.generate(4, (i) {
-      final isTouched = i == touchedIndex;
-      final fontSize = isTouched ? 20.0 : 16.0;
-      final radius = isTouched ? 30.0 : 20.0;
-
-      switch (i) {
-        case 0:
-          return PieChartSectionData(
-            color: AppColors.primary, value: 45, title: '', radius: radius,
-          );
-        case 1:
-          return PieChartSectionData(
-            color: Colors.blue, value: 25, title: '', radius: radius,
-          );
-        case 2:
-          return PieChartSectionData(
-            color: Colors.orange, value: 15, title: '', radius: radius,
-          );
-        case 3:
-          return PieChartSectionData(
-            color: Colors.grey, value: 15, title: '', radius: radius,
-          );
-        default:
-          throw Error();
-      }
-    });
-  }
-
-  Widget _buildSectionHeader(String title) {
-    return Text(
-      title,
-      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-    );
-  }
-
-  Widget _buildCategoryReportItem(
-      BuildContext context, IconData icon, String title,
-      String amount, String percent, Color color, bool isDarkMode
-      ) {
-    return InkWell(
-      onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const CategoryTransactionScreen())
-      ),
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isDarkMode ? AppColors.cardDark : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: isDarkMode ? Colors.white10 : Colors.grey[200]!),
-        ),
-        child: Row(
+
+        child: Column(
+
           children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
-              child: Icon(icon, color: color, size: 20),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  Text(percent, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                ],
-              ),
-            ),
-            Text(amount, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-            const Icon(Icons.chevron_right, color: Colors.grey, size: 20),
+
+            _buildMonthSelector(),
+
+            const SizedBox(height:20),
+
+            _buildSummaryCards(),
+
+            const SizedBox(height:25),
+
+            _buildPieChart(),
+
+            const SizedBox(height:20),
+
+            _buildTopCategory(),
+
+            const SizedBox(height:20),
+
+            _buildCategoryList(),
+
           ],
+
         ),
+
       ),
+
     );
+
   }
+
+  Widget _buildMonthSelector(){
+
+    return Row(
+
+      mainAxisAlignment: MainAxisAlignment.center,
+
+      children: [
+
+        IconButton(
+          icon: const Icon(Icons.chevron_left),
+          onPressed: (){
+            selectedMonth =
+                DateTime(selectedMonth.year,
+                    selectedMonth.month - 1);
+            loadReport();
+          },
+        ),
+
+        Text(
+          "${selectedMonth.month}/${selectedMonth.year}",
+          style: const TextStyle(
+              fontSize:16,
+              fontWeight: FontWeight.bold),
+        ),
+
+        IconButton(
+          icon: const Icon(Icons.chevron_right),
+          onPressed: (){
+            selectedMonth =
+                DateTime(selectedMonth.year,
+                    selectedMonth.month + 1);
+            loadReport();
+          },
+        )
+
+      ],
+
+    );
+
+  }
+
+  Widget _buildSummaryCards(){
+
+    final lang = AppLocalizations.of(context)!;
+
+    return Row(
+
+      children: [
+
+        Expanded(
+            child: _buildCard(lang.income, income, Colors.green)),
+
+        const SizedBox(width:10),
+
+        Expanded(
+            child: _buildCard(lang.expense, expense, Colors.red)),
+
+        const SizedBox(width:10),
+
+        Expanded(
+            child: _buildCard(lang.balance, balance, Colors.blue)),
+
+      ],
+
+    );
+
+  }
+
+  Widget _buildCard(String title,double value,Color color){
+
+    return Container(
+
+      padding: const EdgeInsets.all(14),
+
+      decoration: BoxDecoration(
+
+        color: color.withOpacity(0.15),
+
+        borderRadius: BorderRadius.circular(16),
+
+      ),
+
+      child: Column(
+
+        children: [
+
+          Text(
+            title,
+            style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.bold),
+          ),
+
+          const SizedBox(height:6),
+
+          Text(
+            formatMoney(value),
+            style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.bold),
+          )
+
+        ],
+
+      ),
+
+    );
+
+  }
+
+  Widget _buildPieChart(){
+
+    final lang = AppLocalizations.of(context)!;
+
+    if(categoryData.isEmpty){
+      return Text(lang.noExpense);
+    }
+
+    int i = 0;
+
+    return SizedBox(
+
+      height:250,
+
+      child: PieChart(
+
+        PieChartData(
+
+          centerSpaceRadius:50,
+
+          sections: categoryData.entries.map((e){
+
+            final color =
+            Colors.primaries[i %
+                Colors.primaries.length];
+
+            final value = e.value;
+
+            i++;
+
+            return PieChartSectionData(
+
+              color: color,
+
+              value: value,
+
+              title:
+              "${((value/totalExpense)*100).toStringAsFixed(0)}%",
+
+              radius: 40,
+
+              titleStyle: const TextStyle(
+                  fontSize:12,
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold),
+
+            );
+
+          }).toList(),
+
+        ),
+
+      ),
+
+    );
+
+  }
+
+  Widget _buildTopCategory(){
+
+    final lang = AppLocalizations.of(context)!;
+
+    return Container(
+
+      padding: const EdgeInsets.all(14),
+
+      decoration: BoxDecoration(
+
+        color: Colors.orange.withOpacity(0.2),
+
+        borderRadius: BorderRadius.circular(14),
+
+      ),
+
+      child: Row(
+
+        children: [
+
+          const Icon(Icons.local_fire_department,
+              color: Colors.orange),
+
+          const SizedBox(width:10),
+
+          Text(
+            "${lang.topCategory}: ${getCategoryName(topCategory)}",
+            style: const TextStyle(
+                fontWeight: FontWeight.bold),
+          ),
+
+        ],
+
+      ),
+
+    );
+
+  }
+
+  Widget _buildCategoryList(){
+
+    final sorted = categoryData.entries.toList()
+      ..sort((a,b)=>b.value.compareTo(a.value));
+
+    int i = 0;
+
+    return Column(
+
+      children: sorted.map((e){
+
+        final percent =
+        (e.value/totalExpense);
+
+        final color =
+        Colors.primaries[i % Colors.primaries.length];
+
+        i++;
+
+        return TweenAnimationBuilder<double>(
+
+          duration: const Duration(milliseconds: 600),
+
+          tween: Tween(begin: 0,end: percent),
+
+          builder: (context,value,child){
+
+            return InkWell(
+
+              onTap: (){
+
+                Navigator.push(
+
+                  context,
+
+                  MaterialPageRoute(
+
+                    builder: (_) =>
+                        CategoryTransactionScreen(
+
+                          category: e.key,
+                          month: selectedMonth.month,
+                          year: selectedMonth.year,
+
+                        ),
+
+                  ),
+
+                );
+
+              },
+
+              child: Container(
+
+                margin: const EdgeInsets.only(bottom:14),
+
+                padding: const EdgeInsets.all(16),
+
+                decoration: BoxDecoration(
+
+                  color: Theme.of(context).cardColor,
+
+                  borderRadius: BorderRadius.circular(18),
+
+                  boxShadow: const [
+                    BoxShadow(
+                      blurRadius: 6,
+                      color: Colors.black12,
+                    )
+                  ],
+
+                ),
+
+                child: Column(
+
+                  children: [
+
+                    Row(
+
+                      children: [
+
+                        CircleAvatar(
+
+                          backgroundColor:
+                          color.withOpacity(0.15),
+
+                          child: Icon(
+                            getCategoryIcon(e.key),
+                            color: color,
+                          ),
+
+                        ),
+
+                        const SizedBox(width:12),
+
+                        Expanded(
+
+                          child: Column(
+
+                            crossAxisAlignment:
+                            CrossAxisAlignment.start,
+
+                            children: [
+
+                              Text(
+                                getCategoryName(e.key),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize:15),
+                              ),
+
+                              const SizedBox(height:3),
+
+                              Text(
+                                "${(percent*100).toStringAsFixed(0)}%",
+                                style: TextStyle(
+                                    fontSize:12,
+                                    color: Colors.grey[600]),
+                              )
+
+                            ],
+
+                          ),
+
+                        ),
+
+                        Text(
+                          formatMoney(e.value),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize:15),
+                        )
+
+                      ],
+
+                    ),
+
+                    const SizedBox(height:12),
+
+                    ClipRRect(
+
+                      borderRadius: BorderRadius.circular(10),
+
+                      child: LinearProgressIndicator(
+
+                        value: value,
+
+                        minHeight: 8,
+
+                        backgroundColor: Colors.grey[200],
+
+                        valueColor:
+                        AlwaysStoppedAnimation(color),
+
+                      ),
+
+                    )
+
+                  ],
+
+                ),
+
+              ),
+
+            );
+
+          },
+
+        );
+
+      }).toList(),
+
+    );
+
+  }
+
 }
